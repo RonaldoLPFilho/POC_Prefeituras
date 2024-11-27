@@ -7,7 +7,7 @@ import java.util.Map;
 
 public class UrlUtils {
 
-    public static Map<String, String> extractQueryParams(URL url) {
+    public static Map<String, String> extractQueryParamsToMap(URL url) {
         Map<String, String> queryParams = new HashMap<>();
         String query = url.getQuery();
 
@@ -23,5 +23,6 @@ public class UrlUtils {
 
         return queryParams;
     }
+
 
 }

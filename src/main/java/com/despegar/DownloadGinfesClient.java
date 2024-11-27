@@ -7,7 +7,7 @@ import java.net.URLEncoder;
 
 public class DownloadGinfesClient {
 
-    public void postToGinfesAndSavePdf(String nfsValue) {
+    public boolean postToGinfesAndSavePdf(String nfsValue) {
         try {
             URL url = new URL("https://visualizar.ginfes.com.br/report/exportacao");
 
@@ -42,7 +42,8 @@ public class DownloadGinfesClient {
                 if (statusCode == HttpURLConnection.HTTP_MOVED_TEMP || statusCode == HttpURLConnection.HTTP_MOVED_PERM) {
                     String redirectUrl = connection.getHeaderField("Location");
                     if (redirectUrl == null) {
-                        throw new IOException("Erro no redirect no GINFES CLIENT");
+                        System.err.println("Erro no redirecionamento GINFES client ");
+                        return false;
                     }
                     System.out.println("Redirecionando para: " + redirectUrl);
                     url = new URL(redirectUrl); // Atualiza a URL para seguir o redirecionamento
@@ -56,7 +57,8 @@ public class DownloadGinfesClient {
                     if (!directory.exists()) {
                         boolean created = directory.mkdir();
                         if (!created) {
-                            throw new IOException("Não foi possível criar a pasta 'arquivos'.");
+                            System.err.println("Erro ao criar a pasta");
+                            return false;
                         }
                     }
 
@@ -74,10 +76,9 @@ public class DownloadGinfesClient {
 
                     System.out.println("Arquivo PDF salvo com sucesso em: " + pdfFile.getAbsolutePath());
                     connection.disconnect();
-                    break; // Encerra o loop após salvar o PDF com sucesso
-                } else {
+                    return true;
+                }
                     // ERROR AREA
-
                     InputStream errorStream = connection.getErrorStream();
                     if (errorStream != null) {
                         BufferedReader errorReader = new BufferedReader(new InputStreamReader(errorStream));
@@ -92,11 +93,12 @@ public class DownloadGinfesClient {
                         System.err.println("Erro na requisição POST: HTTP " + statusCode);
                     }
                     connection.disconnect();
-                    break; // Encerra o loop em caso de erro
+                    return false;
                 }
-            }
+
         } catch (Exception e) {
             System.err.println("Erro ao realizar a requisição: " + e.getMessage());
+            return false;
         }
     }
 }

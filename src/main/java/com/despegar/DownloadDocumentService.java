@@ -1,128 +1,56 @@
 package com.despegar;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
-import java.net.MalformedURLException;
+
 import java.net.URL;
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
-import static com.despegar.utils.UrlUtils.extractQueryParams;
+import static com.despegar.utils.HtmlUtils.findCorrectHtmlFromUrl;
+import static com.despegar.utils.HtmlUtils.nfsExtractorFromHtml;
+import static com.despegar.utils.UrlUtils.extractQueryParamsToMap;
 
 public class DownloadDocumentService {
 
-    public String findCorrectHTML(URL url) {
-        URL currentUrl = url;
-        String htmlContent = "";
+    public String proccessAndDownloadDocumentByUrl(URL url){
+        DownloadDocumentService downloadDocumentService = new DownloadDocumentService();
 
-        try {
-            //LOOPING PARA LIDAR COM OS MULTIPLOS POSSÍVEIS REDIRECTS
-            while (true) {
-                HttpURLConnection connection = (HttpURLConnection) currentUrl.openConnection();
-                connection.setRequestMethod("GET");
-                connection.setInstanceFollowRedirects(false);
-                connection.setConnectTimeout(5000);
-                connection.setReadTimeout(5000);
+        if (url.getHost().contains("ginfes") || url.getHost().contains("nfse.isssbc") )
+            return downloadDocumentService.downloadDocumentOnGinfes(url);
 
-                int statusCode = connection.getResponseCode();
+        if(url.getHost().contains("prefeitura.sp") || url.getHost().contains("rio.gov"))
+            return downloadDocumentService.downloadDocumentoAlternativo(url);
 
-                if (statusCode == 302 || statusCode == 301) {
-                    String redirectUrl = connection.getHeaderField("Location");
-                    System.out.println("Redirecionando para: " + redirectUrl);
-                    currentUrl = new URL(redirectUrl);
+        return "Link não identificado";
+    }
 
+    public String downloadDocumentOnGinfes(URL url) {
+        String html = findCorrectHtmlFromUrl(url);
+        String nfs = nfsExtractorFromHtml(html);
+        DownloadGinfesClient client = new DownloadGinfesClient();
+        try{
+            if(client.postToGinfesAndSavePdf(nfs))
+                return "Arquivo baixado com sucesso! (Ginfes)";
 
-                } else if (statusCode == 200) {
-                    BufferedReader in = new BufferedReader(new InputStreamReader(connection.getInputStream()));
-                    StringBuilder response = new StringBuilder();
-                    String line;
-
-                    while ((line = in.readLine()) != null) {
-                        response.append(line).append("\n");
-                    }
-                    in.close();
-                    connection.disconnect();
-
-                    String locationPattern = "location\\s*=\\s*['\"](.*?)['\"]";
-                    Pattern pattern = Pattern.compile(locationPattern);
-                    Matcher matcher = pattern.matcher(response.toString());
-
-                    //CAPTURAR REDIRECT JAVASCRIPT, RE-EXECUTAR COM NOVA URL
-                    if (matcher.find()) {
-                        String newLocation = matcher.group(1);
-                        System.out.println("Novo URL encontrado no JavaScript: " + newLocation);
-                        currentUrl = new URL(newLocation);
-
-                    } else {
-
-                        // Não encontrou redirecionamento, HTML FINAL
-                        try{
-                            htmlContent = response.toString();
-                            String nfsValue = nfsExtractorFromHtml(htmlContent);
-
-                            DownloadGinfesClient client = new DownloadGinfesClient();
-                            client.postToGinfesAndSavePdf(nfsValue);
-
-                            System.out.println(nfsValue);
-
-                            return "Arquivo baixado com sucesso!";
-                        } catch (Exception e) {
-                            return "Houve um erro ao baixar o arquivo: " + e.getMessage();
-                        }
-
-                    }
-                } else {
-                    connection.disconnect();
-                    return "Erro na chamada, status code: " + statusCode;
-                }
-            }
-        } catch (IOException e) {
-            return "Erro na chamada: " + e.getMessage();
+            return "Falha ao baixar o arquivo (GINFES)";
+        }catch (Exception e) {
+            return ("(GINFES) Alguma excessão foi lancada, DEBUGGUE: " + e.getMessage());
         }
     }
 
-    public String nfsExtractorFromHtml(String html) {
-        int startIndex = html.indexOf("name=\"nfs\" value=\"");
+    public String downloadDocumentoAlternativo(URL url) {
+        DownloadAlternativoClient client = new DownloadAlternativoClient();
 
-        if (startIndex == -1) {
-            return "Não foi possível encontrar o valor de 'nfs' no HTML.";
-        }
+        Map<String, String> queryParamsByOrinalUrl = extractQueryParamsToMap(url);
 
-        startIndex += "name=\"nfs\" value=\"".length();
-        int endIndex = html.indexOf("\"", startIndex);
+        try{
+            if(client.postWithCookiesAndSaveGif(queryParamsByOrinalUrl))
 
-        if (endIndex == -1) {
-            return "Não foi possível encontrar o valor de 'nfs' no HTML.";
-        }
+                return "Arquivo baixado com sucesso! (Alternativo)";
 
-        return html.substring(startIndex, endIndex);
-    }
-
-    public URL assembleUrlToAlternativo(URL url) {
-        try {
-            // Extrair os parametros da URL orinal
-            Map<String, String> queryParams = extractQueryParams(url);
-
-            String baseUrl = "https://notacarioca.rio.gov.br/contribuinte/notaprintimg.aspx";
-            StringBuilder newUrl = new StringBuilder(baseUrl);
-
-            newUrl.append("?ccm=").append(queryParams.get("ccm"))
-                    .append("&nf=").append(queryParams.get("nf"))
-                    .append("&verificacao=").append(queryParams.get("verificacao"))
-                    .append("&imprimir=0");
-
-            return new URL(newUrl.toString());
-        } catch (MalformedURLException e) {
-            System.err.println("Erro ao montar a URL: " + e.getMessage());
-            return null;
+            return "Falha ao baixar o arquivo (Alternativo)";
+        }catch (Exception e) {
+            return ("(Alternativo) Alguma excessão foi lancada, DEBUGGUE: " + e.getMessage());
         }
 
     }
-
-//    public String downloadDocumentOnGinfes(){}
 
 
 

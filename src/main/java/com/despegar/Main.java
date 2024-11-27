@@ -8,6 +8,7 @@ public class Main {
 
     public static void main(String[] args) throws MalformedURLException {
 
+        DownloadDocumentService service = new DownloadDocumentService();
         Scanner scanner = new Scanner(System.in);
 
         System.out.println("----------------------- BEM-VINDO -----------------------");
@@ -18,23 +19,12 @@ public class Main {
 
         URL url = new URL(link);
 
-        String teste = parseUrl(url);
+        String teste = service.proccessAndDownloadDocumentByUrl(url);
 
         System.out.println(teste);
 
     }
 
-    public static String parseUrl(URL url){
-       DownloadDocumentService downloadDocumentService = new DownloadDocumentService();
 
-        if (url.getHost().contains("ginfes") || url.getHost().contains("nfse.isssbc") )
-            return downloadDocumentService.findCorrectHTML(url);
-
-        if(url.getHost().contains("prefeitura.sp") || url.getHost().contains("rio.gov"))
-            return "URL não é do ginfes";
-
-
-        return "Link não identificado";
-    }
 
 }
